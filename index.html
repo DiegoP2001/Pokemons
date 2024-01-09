@@ -1,0 +1,814 @@
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<!-- Compiled and minified CSS -->
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"
+/>
+<!--FontFamily Pokemon-->
+<link href="https://fonts.cdnfonts.com/css/eviolite-b" rel="stylesheet" />
+<!-- Compiled and minified JavaScript -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<!-- FontAwesome -->
+<script
+  src="https://kit.fontawesome.com/1f48b5e93f.js"
+  crossorigin="anonymous"
+></script>
+
+<div id="app">
+  <Navbar @open-cart="handleOpenCart" @show-pokemons="handlePokemons" logo_src="./pokemon-23.svg"></Navbar>
+  <transition name="container-transition">
+    <div v-if="show_container">
+      <div class="pagination">
+        <button id="prev_btn" :disabled="is_prev_disabled" @click="prev_page()">
+          Previous Page
+        </button>
+        <button id="next_btn" :disabled="is_next_disabled" @click="next_page()">
+          Next Page
+        </button>
+      </div>
+      <div class="container">
+        <div id="shop">
+          <!--((pagina - 1) * articles_per_page, pagina * articles_per_page)"-->
+          <Pokemon_card
+            @add_item="add_to_shop_cart"
+            v-for="(nombre, index) in pokemon_names.slice((page - 1) * pokemons_per_page, page * pokemons_per_page)"
+            :key="index"
+            :nombre="nombre"
+            :precio="(Math.random()*100).toFixed(2)"
+            :counter="pokemon_names"
+          >
+          </Pokemon_card>
+        </div>
+      </div>
+    </div>
+    <div v-else>
+      <div class="container_shop_cart">
+        <div class="sidebar-div">
+          <Shopcart :shop_cart="shop_cart" @del-pokemon="handleDelPokemon"></Shopcart>
+        </div>
+      </div>
+    </div>
+  </transition>
+</div>
+
+<script>
+  
+  const { createApp } = Vue;
+
+  let app = createApp({
+    data() {
+      return {
+        pokemons: [], //results/ name || url
+        pokemon_names: [],
+        pokemon_urls: [],
+        page: 1,
+        pokemons_per_page: 12,
+        shop_cart: [],
+        show_pokemons: true,
+        show_container: true,
+      };
+    },
+    methods: {
+      get_info() {
+        fetch("https://pokeapi.co/api/v2/pokemon/?offset=0&limit=100")
+          .then((response) => response.json())
+          .then((data) => {
+            this.pokemons = data.results;
+            this.get_names();
+            this.get_urls();
+          })
+          .catch((error) => console.error(error));
+      },
+      get_names() {
+        for (let i = 0; i < this.pokemons.length; i++) {
+          this.pokemon_names.push(this.pokemons[i].name);
+        }
+      },
+      get_urls() {
+        for (let i = 0; i < this.pokemons.length; i++) {
+          this.pokemon_urls.push(this.pokemons[i].url);
+        }
+      },
+      prev_page() {
+        this.page--;
+      },
+      next_page() {
+        this.page++;
+      },
+      add_to_shop_cart: function (item) {
+        let isInArray = false
+
+        if(this.shop_cart.length > 0){
+          for(const pokemon of this.shop_cart){
+            console.log(pokemon.nombre)
+            console.log(item.nombre)
+            if(pokemon.nombre !== item.nombre){
+              isInArray = false
+            }else{
+              isInArray = true
+              break;
+            }
+          }
+        }
+
+        if(isInArray === false){
+          this.shop_cart.push(item);
+
+          const nombre_mayus =
+            item.nombre[0].toUpperCase() + item.nombre.substring(1);
+
+          alert(`${nombre_mayus} ha sido añadido al carrito.`);
+        }else{
+          alert("El producto ha sido añadido anteriormente")
+        }
+      },
+      handleOpenCart(payload) {
+        this.show_pokemons = payload.show_pokemons;
+        this.show_container = payload.show_container;
+      },
+      handlePokemons(param) {
+        this.show_pokemons = param.show_pokemons;
+        this.show_container = param.show_container;
+      },
+      handleDelPokemon(payload) {
+        this.shop_cart = payload.shop
+      }
+    },
+    computed: {
+      is_prev_disabled() {
+        if (this.page !== 1) {
+          return false;
+          console.log("NO DISABLED 1");
+        } else {
+          return true;
+          console.log("DISABLED 1");
+        }
+      },
+      is_next_disabled() {
+        if (this.page * this.pokemons_per_page < this.pokemons.length) {
+          return false;
+          console.log("NO DISABLED 2");
+        } else {
+          return true;
+          console.log("DISABLED 2");
+        }
+      },
+    },
+    mounted() {
+      this.get_info();
+    },
+  });
+
+  /*
+    app.component('saludar',{
+        props:['nombre'],
+        template: `
+          <div>
+            <h2>Hola {{nombre}}</h2>
+            <p>Este es un saludo desde un componente</p>
+          </div>  
+        `
+    }
+    )
+  */
+  app.component("Pokemon_card", {
+    props: ["nombre", "precio", "counter"],
+    template: `
+      <div class="poke_ball">
+        <div :id="'card_' + counter.indexOf(nombre.toLowerCase())" class="poke_card">
+          <img :src="computedImageUrl" :alt="'Imagen de ' + nombre">
+          <h3> {{ nombre.toUpperCase() }} </h3>
+          <p>Price: {{ precio }}€</p>
+          <button class="poke_card_btn" @click="add_to_cart"><i class="fa-solid fa-cart-shopping"></i> Add to cart</button>
+        </div>
+      </div>
+      `,
+    data() {
+      return {
+        pokemon_image_url: null,
+      };
+    },
+    methods: {
+      get_img_source() {
+        const nombre_pokemon = this.nombre;
+        fetch(`https://pokeapi.co/api/v2/pokemon/${nombre_pokemon}/`)
+          .then((response) => response.json())
+          .then((data) => {
+            // la ruta a Imagen es data / sprites / other / dream_world / front_default
+            const img = data.sprites.other.home.front_shiny;
+
+            this.pokemon_image_url = img;
+          })
+          .catch((error) => console.error(error));
+      },
+      add_to_cart: function () {
+        this.$emit("add_item", {
+          img: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/${
+            this.counter.indexOf(this.nombre.toLowerCase()) + 1
+          }.png`,
+          nombre: this.nombre,
+          precio: this.precio,
+          cantidad: 1,
+        });
+      },
+    },
+    computed: {
+      computedImageUrl() {
+        return this.pokemon_image_url ? this.pokemon_image_url : "";
+      },
+    },
+    watch: {
+      // Manejar cambios en el nombre para cargar la nueva imagen
+      nombre: function () {
+        this.get_img_source();
+      },
+    },
+    mounted() {
+      this.get_img_source();
+    },
+  });
+
+  app.component("Navbar", {
+    props: ["logo_src"],
+    template: `
+      <div class="navbar">
+        <img class="logo" :src="logo_src" alt="Logotipo" width="200">
+        <ul class="navbar_items">
+          <li @click="unavailable()">
+            Services
+          </li>
+          <li id="nav_show_pokemons" @click="show_pokemons()">
+            <i class="fa-solid fa-spaghetti-monster-flying"></i>Pokemons
+          </li>
+          <li @click="unavailable()">
+            About us
+
+          </li>
+          <li @click="unavailable()">
+            Contact
+
+          </li>
+          <li @click="open_cart()">
+            <i class="fa-solid fa-cart-shopping"></i>
+          </li>
+        </ul>
+      </div>
+    `,
+    methods: {
+      unavailable() {
+        alert("Feature Unavailable");
+      },
+      open_cart: function () {
+        this.$emit("open-cart", {
+          show_pokemons: false,
+          show_container: false,
+        });
+      },
+      show_pokemons: function (){
+        this.$emit("show-pokemons", {
+          show_pokemons: true,
+          show_container: true,
+        })
+      }
+    },
+  });
+
+  app.component("Shopcart", {
+    props: ["shop_cart"],
+    template: `
+      <div class="sidenav-hidden">
+        <ul class="cart_items">
+          <li class="cart_box" v-if="shop_cart.length > 0" v-for="(pokemon, index) in shop_cart" :key="index"> 
+            <img :src="pokemon.img" :alt="'Imagen de ' + pokemon.nombre" width="200px">
+            <h4> {{ pokemon.nombre[0].toUpperCase() + pokemon.nombre.slice(1) }} </h4>
+            <p> <strong>{{ pokemon.precio }}</strong> EUR ( {{ pokemon.precio }} EUR / unidad) </p>
+            <select v-model="selected_currency" @change="handleChange"> 
+              <option v-for="(currency, index) in monedas" :key="index" :value="currency.code">{{ currency.code }}</option>
+            </select>
+            <div class="cantidad">
+              <button class="btn-cantidad" @click="disminuir(index)" > - </button>
+              <h5> {{ internal_shop_cart[index].cantidad }} </h5>
+              <button class="btn-cantidad" @click="aumentar(index)" > + </button>
+            </div>
+            <button id="btn-del" @click="eliminar(index)"><i class="fa-solid fa-trash"></i> Remove from cart</button>
+          </li>
+          <li v-else id="vacio">
+            <h1>El carro de compras está vacío</h1>
+          </li>
+        </ul>
+          <h3 id="cantidad_total" v-if="shop_cart.length > 0 && selected_currency == 'EUR'">
+            Total: {{ calcular_total }} {{ selected_currency }}
+          </h3>
+          <h3 id="cantidad_total" v-else>
+            Total: {{ calcular_exchange }} {{ selected_currency }}
+          </h3>
+        </div>
+      `,
+      data(){
+        return{
+          internal_shop_cart: this.shop_cart.slice(),
+          cantidad_total: 0,
+          monedas: [],
+          selected_currency: "EUR", 
+          inic_currency: [], 
+          exchange_value: 0
+        }
+      },
+      methods: {
+        get_coins: function() {
+          const api_key = "fca_live_kN0gIhBMf3T3MXOamB8uxSOWiK3vobSQzExzc1wc";
+          fetch(`https://api.freecurrencyapi.com/v1/currencies?apikey=${api_key}`)
+          .then((response) => response.json())
+          .then((data) => {
+            if(data){
+              this.monedas = data.data
+              console.log(data.data)
+              this.inic_currency = Object.keys(data.data)
+            }else{
+              console.log("Data is undefined.")
+            }
+          })
+          .catch((error) => console.error(error));
+        },
+        handleChange: function() {
+          const source = 'EUR'        
+          const api_key = "fca_live_kN0gIhBMf3T3MXOamB8uxSOWiK3vobSQzExzc1wc";
+          fetch(`https://api.freecurrencyapi.com/v1/latest?apikey=${api_key}&base_currency=${source}&currencies=${this.selected_currency}`)
+            .then((response) => response.json())
+            .then((data) => {
+              if(data){
+                this.exchange_value = data.data[this.selected_currency]
+                console.log(this.selected_currency)
+              }else{
+                console.log("Data is undefined.")
+              }
+            })
+            .catch((error) => console.error(error));
+        },
+        eliminar: function (index){
+          const new_shop_cart = this.internal_shop_cart.splice(index, 1);
+          this.$emit('del-pokemon', {
+            shop: this.internal_shop_cart.slice()
+          })
+        },
+        disminuir: function(index) {
+          if (this.internal_shop_cart[index].cantidad > 1) {
+            this.internal_shop_cart[index].cantidad = this.internal_shop_cart[index].cantidad - 1
+          }
+          console.log(this.internal_shop_cart[index].cantidad)
+        },
+        aumentar: function(index) {
+          this.internal_shop_cart[index].cantidad = this.internal_shop_cart[index].cantidad + 1
+          console.log(this.internal_shop_cart[index].cantidad)
+        },
+      },
+      computed: {
+        calcular_total(){
+          this.cantidad_total = 0; 
+          
+          for (const pokemon of this.internal_shop_cart) {
+            // Convierte pokemon.precio a número antes de sumarlo
+            //this.cantidad_pokemons = pokemon.cantidad != null ? this.cantidad_pokemons : 1
+            this.cantidad_total += parseFloat(pokemon.precio) * parseFloat(pokemon.cantidad);
+          }
+
+
+          const cantidad = this.cantidad_total.toFixed(2)
+          return cantidad
+        },
+        calcular_exchange(){
+          this.cantidad_total = 0; 
+          console.log("ENTRO EN EL EXCHANGE")
+          console.log(this.exchange_value)
+          for (const pokemon of this.internal_shop_cart) {
+            // Convierte pokemon.precio a número antes de sumarlo
+            //this.cantidad_pokemons = pokemon.cantidad != null ? this.cantidad_pokemons : 1
+            this.cantidad_total += parseFloat(pokemon.precio) * parseFloat(pokemon.cantidad) * this.exchange_value;
+          }
+
+
+          const cantidad = this.cantidad_total.toFixed(2)
+          return cantidad
+        }
+      },
+      mounted(){
+        this.get_coins();
+      }
+  });
+
+  app.mount("#app");
+</script>
+
+<style>
+  body {
+    margin: 10px;
+    background-color: rgba(0, 0, 0, 0.817);
+  }
+
+  .navbar {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .navbar_items {
+    margin-right: 20px;
+    display: flex;
+    flex-direction: row;
+    column-gap: 30px;
+  }
+
+  .navbar_items > li {
+    color: white;
+    align-self: center;
+    justify-self: center;
+    padding: 10px;
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 15pt;
+    border-radius: 8px;
+  }
+
+  .navbar_items > li:hover {
+    cursor: pointer;
+  }
+
+  /*Carro de compras*/
+  .navbar_items > li:last-child > i {
+    color: white;
+  }
+
+  .navbar_items > li:last-child {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    background-color: rgb(70, 70, 229);
+  }
+
+  .navbar_items > li:last-child:hover {
+    animation: stretch_cart_item 1s ease-out;
+    animation-fill-mode: forwards;
+  }
+
+  .navbar_items > li:last-child:not(:hover) {
+    animation: tie_cart_item 1s;
+    animation-fill-mode: forwards;
+  }
+
+  /*Pagination Buttons*/
+  .pagination {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /*Logo*/
+  .logo {
+    margin: 20px;
+    filter: drop-shadow(10px 10px 5px rgba(0, 0, 0, 0.5));
+  }
+
+  /*Cartas de pokemon*/
+  .poke_card > img {
+    cursor: pointer;
+    filter: drop-shadow(20px 20px 5px rgba(0, 0, 0, 0.5));
+    width: 30vh;
+  }
+
+  .poke_card > img:hover {
+    transition: all 1s ease-in-out;
+    scale: 1.2;
+  }
+
+  #shop {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    column-gap: 20px;
+    row-gap: 20px;
+    place-items: end;
+  }
+
+  .poke_card {
+    padding: 50px;
+    width: 25vw;
+    height: 30vw;
+    border-radius: 50%;
+    margin-top: 20px;
+    background: linear-gradient(to bottom, red 20%, 50%, white 20%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 0, 0, 1) inset;
+  }
+
+  .poke_card img {
+    width: 13vw;
+    margin-top: 10px;
+    transform: translate(-10px, -10px);
+    transition: transform 1s ease-in-out;
+    animation: floatAnimation 2s infinite alternate;
+  }
+
+  .poke_card > h3 {
+    font-family: "Eviolite B", sans-serif;
+    font-size: 25pt;
+    font-weight: 700;
+    color: black;
+  }
+
+  .poke_card > p {
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 14pt;
+  }
+
+  .poke_card_btn {
+    background-color: black;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-family: monospace;
+    font-weight: 700;
+    margin-bottom: 20%;
+  }
+
+  .poke_card_btn:hover {
+    cursor: pointer;
+    animation: color 0.5s;
+    animation-fill-mode: forwards;
+  }
+
+  .container {
+    margin-right: 6vw;
+    margin-left: 10vw;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-content: space-between;
+  }
+
+  /*Pagination*/
+
+  .pagination > button {
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 12pt;
+    border: none;
+    padding: 10px;
+    margin-right: 20px;
+    border-radius: 8px;
+    background-color: rgb(70, 70, 229);
+    color: white;
+  }
+
+  .pagination > button:hover {
+    cursor: pointer;
+    animation: color_to_white 1s;
+    animation-fill-mode: forwards;
+  }
+
+  /*Pagination Buttons*/
+  #prev_btn:disabled {
+    opacity: 0.3;
+    animation: none;
+  }
+
+  #next_btn:disabled {
+    opacity: 0.3;
+    animation: none;
+  }
+
+  /*Sidebar*/
+
+  /*
+    
+      <div class="poke_ball">
+        <div :id="'card_' + counter.indexOf(nombre.toLowerCase())" class="poke_card">
+          <img :src="computedImageUrl" :alt="'Imagen de ' + nombre">
+          <h3> {{ nombre.toUpperCase() }} </h3>
+          <p>Price: {{ precio }}€</p>
+          <button class="poke_card_btn" @click="add_to_cart"><i class="fa-solid fa-cart-shopping"></i> Add to cart</button>
+        </div>
+      </div>
+    
+      */
+  .sidenav-hidden {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-content: center;
+  }
+
+  /*#shop {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    column-gap: 20px;
+    row-gap: 20px;
+    place-items: end;
+  }*/
+
+  .cart_items{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    column-gap: 20px;
+    row-gap: 20px;
+    justify-content: center;
+    align-content: center;
+  }
+
+
+  .cart_box{
+    padding: 50px;
+    width: 25vw;
+    background-color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 0, 0, 1) inset;
+    border-radius: 18px;
+    margin: auto;
+  }
+
+  .cart_box > img{
+    cursor: pointer;
+    filter: drop-shadow(20px 20px 5px rgba(0, 0, 0, 0.5));
+    width: 30vh;
+    transform: translate(-10px, -10px);
+    transition: transform 1s ease-in-out;
+    animation: floatAnimation 2s infinite alternate;
+  }
+
+  .cart_box:first-child{
+    grid-column-start: 2;
+  }
+
+  .cart_box:nth-child(2){
+    grid-column-start: 1;
+    grid-row-start: 1;
+  }
+
+  .cart_box:nth-child(3){
+    grid-column-start: 3;
+    grid-row-start: 1;
+  }
+
+
+  #cantidad_total{
+    text-align: center;
+    font-family: monospace;
+    color: white;
+    
+  }
+
+  #vacio{
+    grid-column-start: 2;
+    text-align: center;
+    font-family: monospace;
+    color: white;
+  }
+
+  .cantidad{
+    margin-top: 10px;
+    width: 40%;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .btn-cantidad{
+    background-color: black;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-family: monospace;
+    font-weight: 700;
+    
+  }
+
+  .btn-cantidad:hover{
+    cursor: pointer;
+    animation: color 1s;
+    animation-fill-mode: forwards;
+  }
+
+  #btn-del{
+    margin-top: 20px;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    background-color: black;
+  }
+
+  #btn-del:hover{
+    cursor: pointer;
+    animation: color 1s;
+    animation-fill-mode: forwards;
+  }
+
+  /*Pokemon navbar button*/
+
+  #nav_show_pokemons {
+    background-color: rgb(70, 70, 229);
+    padding: 5px;
+  }
+
+  #nav_show_pokemons i {
+    margin-right: 10px;
+  }
+
+  .container-transition-enter-active,
+  .container-transition-leave-active {
+    transition: opacity 0.5s; 
+  }
+  .container-transition-enter, .container-transition-leave-to /* .container-transition-leave-active in <2.1.8 */ {
+    opacity: 0;
+  }
+
+  select{
+    display: block;
+    text-align: center;
+  }
+  /*Estilos de Shopcart*/
+  
+
+  @keyframes img_appear {
+    0% {
+      opacity: 0;
+    }
+
+    50% {
+      opacity: 0.5;
+    }
+
+    100% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes floatAnimation {
+    0% {
+      transform: translate(0, -5px);
+    }
+
+    100% {
+      transform: translate(0, -15px);
+    }
+  }
+
+  @keyframes stretch_cart_item {
+    0% {
+      width: 50px;
+    }
+
+    100% {
+      width: 200px;
+    }
+  }
+
+  @keyframes tie_cart_item {
+    0% {
+      width: 200px;
+    }
+
+    100% {
+      width: 50px;
+    }
+  }
+
+  @keyframes color {
+    0% {
+      background-color: black;
+      color: white;
+    }
+
+    100% {
+      background-color: white;
+
+      color: black;
+    }
+  }
+
+  @keyframes color_to_white {
+    0% {
+      background-color: rgb(70, 70, 229);
+      color: white;
+    }
+
+    100% {
+      background-color: white;
+      color: rgb(70, 70, 229);
+    }
+  }
+</style>
